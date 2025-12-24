@@ -21,6 +21,10 @@
       align-items: center;
       padding: 24px 16px 40px;
       color: #333;
+      /* 移动端字体渲染优化 */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
     }
 
     @media (max-width: 480px) {
@@ -536,6 +540,28 @@
     const ctx = canvas.getContext("2d");
     const resultEl = document.getElementById("result");
 
+    // 移动端高 DPI 屏幕优化：根据 devicePixelRatio 缩放 Canvas
+    function setupCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const displaySize = 320; // 显示尺寸
+      const actualSize = displaySize * dpr; // 实际像素尺寸
+      
+      // 设置 Canvas 实际像素尺寸
+      canvas.width = actualSize;
+      canvas.height = actualSize;
+      
+      // 设置 Canvas 显示尺寸（CSS）
+      canvas.style.width = displaySize + "px";
+      canvas.style.height = displaySize + "px";
+      
+      // 缩放绘制上下文，这样所有绘制操作都会自动适配高 DPI
+      ctx.scale(dpr, dpr);
+      
+      // 优化文字渲染
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+    }
+
     let currentType = "milkTea";
     let currentItems = [];
     let currentAngle = 0;
@@ -543,13 +569,14 @@
 
     /* ========= 绘制转盘 ========= */
     function drawWheel() {
-      ctx.clearRect(0, 0, 320, 320);
+      const displaySize = 320;
+      ctx.clearRect(0, 0, displaySize, displaySize);
       const count = currentItems.length;
       if (count === 0) return;
       
       const step = (2 * Math.PI) / count;
-      const centerX = 160;
-      const centerY = 160;
+      const centerX = displaySize / 2;
+      const centerY = displaySize / 2;
       const radius = 150;
 
       // 重要：让“第 1 个扇形的中心”对齐顶部指针（否则指针容易落在扇形边界上导致显示相邻项）
@@ -588,22 +615,28 @@
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         
+        // 优化字体渲染（移动端清晰度）
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        
         // 计算文字可用的最大宽度（扇形半径减去内边距）
         const maxTextRadius = radius - 20; // 留20px内边距
         const textStartRadius = 50; // 文字起始位置（距离中心50px）
         const maxTextWidth = maxTextRadius - textStartRadius;
         
-        // 动态调整字体大小以适应文字长度
-        let fontSize = 14;
+        // 动态调整字体大小以适应文字长度（移动端适当增大）
+        const baseFontSize = window.devicePixelRatio > 1 ? 15 : 14;
+        let fontSize = baseFontSize;
         let displayText = item.name;
-        ctx.font = `${fontSize}px PingFang SC`;
+        // 使用系统字体栈，确保移动端清晰
+        ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif`;
         let textWidth = ctx.measureText(displayText).width;
         
         // 如果文字太长，缩小字体
         if (textWidth > maxTextWidth) {
           fontSize = Math.floor((maxTextWidth / textWidth) * fontSize);
-          fontSize = Math.max(10, fontSize); // 最小10px
-          ctx.font = `${fontSize}px PingFang SC`;
+          fontSize = Math.max(11, fontSize); // 最小11px（移动端更清晰）
+          ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif`;
           textWidth = ctx.measureText(displayText).width;
         }
         
@@ -761,6 +794,7 @@
     });
 
     /* ========= 初始化 ========= */
+    setupCanvas(); // 设置 Canvas 高 DPI 支持
     loadWheels();
     switchWheel("milkTea");
   </script>
