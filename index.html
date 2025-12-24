@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我帮你选择！</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+        "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(180deg, #faf7f3, #f5efe9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+      color: #333;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px 12px 32px;
+      }
+
+      h1 {
+        font-size: 20px;
+        margin-bottom: 12px;
+      }
+
+      .wheel-wrapper {
+        width: min(320px, 85vw);
+        height: min(320px, 85vw);
+      }
+
+      canvas {
+        width: 100%;
+        height: 100%;
+      }
+
+      .spin-btn {
+        padding: 12px 28px;
+        font-size: 15px;
+        margin-top: 20px;
+      }
+
+      .result {
+        font-size: 16px;
+        margin-top: 16px;
+        text-align: center;
+        padding: 0 16px;
+      }
+
+      .modal-content {
+        padding: 20px;
+        width: 95%;
+        max-height: 85vh;
+      }
+
+      .item-row {
+        flex-wrap: wrap;
+      }
+
+      .item-row input,
+      .item-row input[type="text"]:last-of-type {
+        min-width: 0;
+        flex: 1 1 100%;
+        margin-bottom: 8px;
+      }
+
+      .delete-btn {
+        flex: 1 1 auto;
+      }
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .tabs button {
+      padding: 8px 18px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(6px);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      color: #555;
+    }
+
+    .tabs button.active {
+      background: #333;
+      color: #fff;
+    }
+
+    .wheel-wrapper {
+      position: relative;
+      width: 320px;
+      height: 320px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+      transition: transform 3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .pointer {
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 11px solid transparent;
+      border-right: 11px solid transparent;
+      /* 向下指向转盘内侧（朝向圆心）- 外层白色描边 */
+      border-top: 18px solid #fff;
+      z-index: 10;
+    }
+
+    .pointer::after {
+      content: '';
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      /* 内层黑色箭头，向下指向转盘 */
+      border-top: 16px solid #333;
+    }
+
+    .spin-btn {
+      margin-top: 26px;
+      padding: 14px 36px;
+      border-radius: 999px;
+      border: none;
+      background: #333;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .spin-btn:active {
+      transform: scale(0.96);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .result {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .result.show {
+      opacity: 1;
+    }
+
+    .edit-btn {
+      margin-top: 12px;
+      padding: 8px 20px;
+      border-radius: 999px;
+      border: 1px solid #ddd;
+      background: rgba(255, 255, 255, 0.9);
+      color: #666;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .edit-btn:hover {
+      background: #fff;
+      border-color: #999;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #999;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .item-list {
+      margin-bottom: 20px;
+    }
+
+    .item-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+
+    .item-row input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .item-row select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      min-width: 120px;
+    }
+
+    .item-row input[type="text"]:last-of-type {
+      min-width: 100px;
+    }
+
+    .delete-btn {
+      padding: 8px 16px;
+      background: #ff4444;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .add-btn {
+      width: 100%;
+      padding: 10px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .save-btn {
+      width: 100%;
+      padding: 12px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+
+<body>
+  <h1 id="title">今天喝哪杯奶茶？</h1>
+
+  <div class="tabs">
+    <button id="tab-milk" class="active" onclick="switchWheel('milkTea')">
+      奶茶
+    </button>
+    <button id="tab-food" onclick="switchWheel('food')">
+      吃什么
+    </button>
+  </div>
+
+  <div class="wheel-wrapper">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="320" height="320"></canvas>
+  </div>
+
+  <button class="spin-btn" onclick="spin()">开始转 🎯</button>
+
+  <div class="result" id="result"></div>
+
+  <button class="edit-btn" onclick="openEditModal()">编辑内容 ✏️</button>
+
+  <!-- 编辑模态框 -->
+  <div class="modal" id="editModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">编辑内容</div>
+        <button class="close-btn" onclick="closeEditModal()">×</button>
+      </div>
+      <div id="editContent"></div>
+      <button class="save-btn" onclick="saveItems()">保存</button>
+    </div>
+  </div>
+
+  <script>
+    /* ========= 转盘配置 ========= */
+    /* 
+     * 初始内容配置：
+     * 1. 可以直接在这里修改初始的奶茶和食物选项
+     * 2. 修改后，如果用户没有保存过自定义内容，会使用这里的初始值
+     * 3. 如果用户已经保存过自定义内容（在localStorage中），会优先使用保存的内容
+     * 4. 要重置为初始值，可以在浏览器控制台执行：localStorage.removeItem("wheelsData")
+     */
+    let wheels = {
+      milkTea: {
+        title: "今天想喝什么？",
+        items: [
+          { name: "冰淇淋红茶", group: "一点点" },
+          { name: "可可芭蕾", group: "一点点" },
+          { name: "米麻薯", group: "一点点" },
+          { name: "草莓奶绿", group: "一点点" },
+          { name: "奶绿装芒", group: "一点点" },
+          { name: "茉莉奶绿", group: "一点点" },
+          { name: "杨枝甘露", group: "喜茶" },
+          { name: "超级水果茶", group: "茶百道" },
+          { name: "西瓜啵啵", group: "茶百道" },
+          { name: "抹茶脏脏茶", group: "乐乐茶" },
+          { name: "猛犸可可", group: "乐乐茶" },
+          { name: "冰椰荔枝", group: "三号椰" },
+          { name: "霸王茶姬", group: "default" },
+        ],
+      },
+      food: {
+        title: "今天吃什么？",
+        items: [
+          { name: "海底捞麻辣烫", group: "海底捞" },
+          { name: "新疆炒米粉", group: "2" },
+          { name: "麻辣拌", group: "3" },
+          { name: "东北麻辣烫", group: "4" },
+          { name: "老乡鸡", group: "5" },
+          { name: "紫菜包饭", group: "6" },
+          { name: "米村拌饭", group: "7" },
+          { name: "kfc", group: "8" },
+          { name: "轻食沙拉", group: "9" },
+          { name: "Tims", group: "10" },
+          { name: "鑫花溪牛肉粉", group: "11" },
+        ],
+      },
+    };
+
+    // 颜色系统：
+    // - group 可以是中文（例如店名"一点点/喜茶/茶百道"），完全没问题
+    // - 每个 group 会自动分配一个"稳定的颜色"（同店同色），并保存到 localStorage
+    // - 额外保证：在同一轮转盘里，不同 group 尽量分配为不同颜色（避免看起来一片同色）
+    const DEFAULT_COLOR = "#E8E8E8";
+    const GROUP_COLORS_KEY = "groupColors";
+    const COLOR_VERSION_KEY = "colorVersion";
+    const CURRENT_COLOR_VERSION = "v2"; // 更新颜色表时改这个版本号，会自动清除旧缓存
+
+    // 柔和但区分度高的颜色表（数量足够覆盖常见分组）
+    const PREDEFINED_COLORS = [
+      "#FFD4D4", // 粉红
+      "#D4E4FF", // 浅蓝
+      "#D4FFD4", // 浅绿
+      "#FFE4D4", // 浅橙
+      "#E4D4FF", // 浅紫
+      "#FFFAD4", // 浅黄
+      "#D4FFFA", // 浅青
+      "#FFD4E4", // 浅粉
+      "#E4FFD4", // 淡绿
+      "#FAD4FF", // 淡紫红
+      "#D4E4E4", // 淡青灰
+      "#FFE4FA", // 淡粉紫
+      "#E4FAD4", // 黄绿
+      "#D4FAFF", // 天蓝
+      "#FAE4D4", // 杏色
+      "#E4D4E4", // 淡紫灰
+      "#D4FFE4", // 薄荷绿
+      "#FAFAD4", // 米黄
+      "#FFD4FA", // 亮粉
+      "#D4FAFA", // 淡青绿
+    ];
+
+    function loadGroupColors() {
+      // 检查颜色版本，如果版本不匹配就清空旧数据
+      const savedVersion = localStorage.getItem(COLOR_VERSION_KEY);
+      if (savedVersion !== CURRENT_COLOR_VERSION) {
+        localStorage.removeItem(GROUP_COLORS_KEY);
+        localStorage.setItem(COLOR_VERSION_KEY, CURRENT_COLOR_VERSION);
+        return {};
+      }
+
+      const saved = localStorage.getItem(GROUP_COLORS_KEY);
+      if (!saved) return {};
+      try {
+        const parsed = JSON.parse(saved) || {};
+        // 过滤掉无效颜色（例如某些浏览器不支持的 hsl 写法导致的脏数据）
+        const cleaned = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          if (isValidCssColor(v)) cleaned[k] = v;
+        }
+        return cleaned;
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function saveGroupColors(map) {
+      localStorage.setItem(GROUP_COLORS_KEY, JSON.stringify(map));
+    }
+
+    function isValidCssColor(color) {
+      if (!color || typeof color !== "string") return false;
+      const s = new Option().style;
+      s.color = "";
+      s.color = color;
+      return s.color !== "";
+    }
+
+    // 用于稳定分配的 hash
+    function hashStringToInt(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+      }
+      return hash >>> 0;
+    }
+
+    function getGroupColor(groupRaw) {
+      const group = (groupRaw || "").trim();
+      if (!group) return DEFAULT_COLOR;
+
+      const groupColors = loadGroupColors();
+      if (groupColors[group]) return groupColors[group];
+
+      const used = new Set(Object.values(groupColors));
+      const base = hashStringToInt(group) % PREDEFINED_COLORS.length;
+      let color = null;
+      // 线性探测：尽量避免不同 group 被分配到同一个颜色
+      for (let i = 0; i < PREDEFINED_COLORS.length; i++) {
+        const c = PREDEFINED_COLORS[(base + i) % PREDEFINED_COLORS.length];
+        if (!used.has(c)) {
+          color = c;
+          break;
+        }
+      }
+      // 颜色表用尽的极端情况：回退到兼容写法的 HSL（逗号格式兼容性最好）
+      if (!color) {
+        const hue = hashStringToInt(group) % 360;
+        color = `hsl(${hue}, 60%, 88%)`;
+      }
+
+      groupColors[group] = color;
+      saveGroupColors(groupColors);
+      return color;
+    }
+
+    // 从localStorage加载数据
+    // 注意：localStorage数据会持久化保存在浏览器中，即使关闭页面或浏览器，数据也不会丢失
+    // 数据保存在浏览器的本地存储中，每个域名独立存储
+    // 在手机上使用时，数据会保存在手机浏览器的本地存储中，关闭后重新打开仍然存在
+    function loadWheels() {
+      const saved = localStorage.getItem("wheelsData");
+      if (saved) {
+        try {
+          wheels = JSON.parse(saved);
+        } catch (e) {
+          console.error("加载数据失败", e);
+        }
+      }
+    }
+
+    // 保存数据到localStorage
+    // 保存的数据会持久化，即使关闭浏览器或重启手机，数据也不会丢失
+    // 只有在以下情况数据才会丢失：
+    // 1. 用户手动清除浏览器数据
+    // 2. 使用无痕/隐私模式浏览
+    // 3. 浏览器存储空间被清理
+    function saveWheels() {
+      localStorage.setItem("wheelsData", JSON.stringify(wheels));
+    }
+
+    /* ========= 状态 ========= */
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const resultEl = document.getElementById("result");
+
+    let currentType = "milkTea";
+    let currentItems = [];
+    let currentAngle = 0;
+    let spinning = false;
+
+    /* ========= 绘制转盘 ========= */
+    function drawWheel() {
+      ctx.clearRect(0, 0, 320, 320);
+      const count = currentItems.length;
+      if (count === 0) return;
+      
+      const step = (2 * Math.PI) / count;
+      const centerX = 160;
+      const centerY = 160;
+      const radius = 150;
+
+      // 重要：让“第 1 个扇形的中心”对齐顶部指针（否则指针容易落在扇形边界上导致显示相邻项）
+      // 扇形中心 = startAngle + step/2，因此这里从顶部（-90度）再往回偏 step/2
+      const startAngle = -Math.PI / 2 - step / 2;
+
+      currentItems.forEach((item, index) => {
+        const color = getGroupColor(item.group);
+        const angle1 = startAngle + step * index;
+        const angle2 = angle1 + step;
+
+        // 绘制扇形
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, angle1, angle2);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // 绘制分隔线（每个扇形之间都画线，让分界更清晰）
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(
+          centerX + Math.cos(angle2) * radius,
+          centerY + Math.sin(angle2) * radius
+        );
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.15)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 绘制文字
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(angle1 + step / 2);
+        ctx.fillStyle = "#333";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        
+        // 计算文字可用的最大宽度（扇形半径减去内边距）
+        const maxTextRadius = radius - 20; // 留20px内边距
+        const textStartRadius = 50; // 文字起始位置（距离中心50px）
+        const maxTextWidth = maxTextRadius - textStartRadius;
+        
+        // 动态调整字体大小以适应文字长度
+        let fontSize = 14;
+        let displayText = item.name;
+        ctx.font = `${fontSize}px PingFang SC`;
+        let textWidth = ctx.measureText(displayText).width;
+        
+        // 如果文字太长，缩小字体
+        if (textWidth > maxTextWidth) {
+          fontSize = Math.floor((maxTextWidth / textWidth) * fontSize);
+          fontSize = Math.max(10, fontSize); // 最小10px
+          ctx.font = `${fontSize}px PingFang SC`;
+          textWidth = ctx.measureText(displayText).width;
+        }
+        
+        // 如果缩小后还是太长，截断文字并加省略号
+        if (textWidth > maxTextWidth) {
+          while (textWidth > maxTextWidth && displayText.length > 1) {
+            displayText = displayText.slice(0, -1);
+            textWidth = ctx.measureText(displayText + "...").width;
+          }
+          displayText = displayText + "...";
+        }
+        
+        ctx.fillText(displayText, textStartRadius, 0);
+        ctx.restore();
+      });
+    }
+
+    /* ========= 切换转盘 ========= */
+    function switchWheel(type) {
+      if (spinning) return;
+
+      currentType = type;
+      currentItems = [...wheels[type].items];
+      document.getElementById("title").innerText = wheels[type].title;
+
+      document
+        .getElementById("tab-milk")
+        .classList.toggle("active", type === "milkTea");
+      document
+        .getElementById("tab-food")
+        .classList.toggle("active", type === "food");
+
+      resultEl.classList.remove("show");
+      canvas.style.transform = "rotate(0deg)";
+      currentAngle = 0;
+
+      drawWheel();
+    }
+
+    /* ========= 旋转 ========= */
+    function spin() {
+      if (spinning || currentItems.length === 0) return;
+      spinning = true;
+      resultEl.classList.remove("show");
+
+      const count = currentItems.length;
+      const stepDeg = 360 / count;
+      // 随机旋转角度（至少转4圈）
+      const extraRotate = Math.random() * 360 + 360 * 4;
+      currentAngle += extraRotate;
+
+      canvas.style.transform = `rotate(${currentAngle}deg)`;
+
+      setTimeout(() => {
+        // 修复：计算指针指向的真实角度
+        // 转盘从顶部（-90度）开始绘制，顺时针旋转currentAngle度
+        // 指针固定在顶部（0度位置）
+        // 转盘旋转后，需要计算指针指向哪个扇形
+        const finalAngle = currentAngle % 360;
+        // 转盘旋转后，原本在顶部的扇形现在在 (360 - finalAngle) % 360 的位置
+        // 但第一个扇形的中心不在顶部，而是在顶部偏 stepDeg/2 的位置
+        // 所以需要调整计算
+        const adjustedAngle = (360 - finalAngle + stepDeg / 2) % 360;
+        let index = Math.floor(adjustedAngle / stepDeg);
+        // 确保索引在有效范围内
+        index = index % count;
+        if (index < 0) index = (index + count) % count;
+        
+        const selected = currentItems[index];
+        resultEl.innerText = `✨ 就是它：${selected.name}`;
+        resultEl.classList.add("show");
+        spinning = false;
+      }, 3000);
+    }
+
+    /* ========= 编辑功能 ========= */
+    function openEditModal() {
+      if (spinning) return;
+      const modal = document.getElementById("editModal");
+      const content = document.getElementById("editContent");
+      
+      // 只展示“已在当前列表中出现过的组（含中文店名）”，避免误导只能用英文 group
+      const allGroups = [...new Set(wheels[currentType].items.map(item => (item.group || "").trim()).filter(Boolean))];
+      
+      let html = '<button class="add-btn" onclick="addItem()">+ 添加项目</button>';
+      html += '<div class="item-list">';
+      
+      wheels[currentType].items.forEach((item, index) => {
+        html += `
+          <div class="item-row">
+            <input type="text" value="${item.name}" data-index="${index}" data-field="name" placeholder="名称">
+            <input type="text" value="${item.group || ""}" data-index="${index}" data-field="group" placeholder="店名/分组（支持中文，同店同色）" list="groupList" onchange="updateGroupInput(this)">
+            <button class="delete-btn" onclick="deleteItem(${index})">删除</button>
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+      // 共享一个 datalist，避免重复渲染
+      html += `
+        <datalist id="groupList">
+          ${allGroups.map(g => `<option value="${g}">`).join("")}
+        </datalist>
+      `;
+      content.innerHTML = html;
+      
+      // 绑定输入事件
+      content.querySelectorAll('input[data-field="name"]').forEach(el => {
+        el.addEventListener('change', function() {
+          const index = parseInt(this.dataset.index);
+          wheels[currentType].items[index].name = this.value;
+        });
+      });
+      
+      modal.classList.add("show");
+    }
+
+    function updateGroupInput(inputEl) {
+      const index = parseInt(inputEl.dataset.index);
+      const value = inputEl.value.trim();
+      if (value) {
+        wheels[currentType].items[index].group = value;
+        // 确保该 group 有颜色（会自动持久化到 localStorage）
+        getGroupColor(value);
+      } else {
+        wheels[currentType].items[index].group = "";
+      }
+    }
+
+    function closeEditModal() {
+      document.getElementById("editModal").classList.remove("show");
+    }
+
+    function addItem() {
+      wheels[currentType].items.push({ name: "新项目", group: "default" });
+      openEditModal(); // 重新渲染
+    }
+
+    function deleteItem(index) {
+      wheels[currentType].items.splice(index, 1);
+      openEditModal(); // 重新渲染
+    }
+
+    function saveItems() {
+      saveWheels();
+      switchWheel(currentType); // 重新加载并绘制
+      closeEditModal();
+    }
+
+    // 点击模态框外部关闭
+    document.getElementById("editModal").addEventListener("click", function(e) {
+      if (e.target === this) {
+        closeEditModal();
+      }
+    });
+
+    /* ========= 初始化 ========= */
+    loadWheels();
+    switchWheel("milkTea");
+  </script>
+</body>
+</html>
